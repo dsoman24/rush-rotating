@@ -2,7 +2,7 @@
 
 import logging
 
-from lib.sheets import SheetEditor
+from util.sheets import SheetEditor
 from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)

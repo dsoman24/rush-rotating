@@ -5,7 +5,7 @@ import logging
 
 from dotenv import dotenv_values
 from pymongo import MongoClient
-from lib.rotator import Rotator
+from util.rotator import Rotator
 
 logger = logging.getLogger(__name__)
 
