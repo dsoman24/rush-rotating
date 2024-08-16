@@ -36,3 +36,7 @@ The driver for the rotator script is in `src/main.py`. To execute, run
 python3 src/main.py
 ```
 Logs are found in `main.log`.
+
+## Additional Information
+* Google Cloud project link:
+https://console.cloud.google.com/welcome?project=rush-428023
