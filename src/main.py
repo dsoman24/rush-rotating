@@ -9,13 +9,14 @@ from util.rotator import Rotator
 
 logger = logging.getLogger(__name__)
 
-config = dotenv_values(".env")
+config = dotenv_values("src/.env")
 
 def main():
     logging.basicConfig(
         filename="main.log",
         level=logging.INFO,
         filemode="w",
+        format='%(asctime)s: %(name)s - %(levelname)s - %(message)s'
     )
     logger.info("Getting MongoDB Client.")
     client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())

@@ -8,6 +8,7 @@ from googleapiclient.discovery import build
 
 logger = logging.getLogger(__name__)
 
+_KEYS_DIR = "src/keys"
 _DATA_SHEET_NAME = 'data'
 
 class SheetEditor:
@@ -38,18 +39,18 @@ class SheetEditor:
             FileNotFoundError: If the 'keys' directory is not found or if no key
                 files are found.
         """
-        if not os.path.exists("keys"):
-            error_msg = "'src/keys/' directory not found."
+        if not os.path.exists(_KEYS_DIR):
+            error_msg = f"{_KEYS_DIR} directory not found."
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
-        key_files = os.listdir("keys")
+        key_files = os.listdir(_KEYS_DIR)
         if not key_files:
-            error_msg = "No key files found in 'src/keys/' directory."
+            error_msg = f"No key files found in {_KEYS_DIR} directory."
             raise FileNotFoundError(error_msg)
         # Choose first credential file in 'keys' directory
         logger.info(f"Credentials created using key file: {key_files[0]}")
         return service_account.Credentials.from_service_account_file(
-            f"keys/{key_files[0]}",
+            os.path.join(_KEYS_DIR, key_files[0]),
             scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
 
