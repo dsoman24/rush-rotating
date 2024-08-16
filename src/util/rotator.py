@@ -51,27 +51,18 @@ class Rotator:
         """Creates the rows for the data sheet based for all contacts."""
         rows = []
         # Get the collection named "contacts"
-        contacts_collection = self._db["contacts"]  # has reference to survey info and attendance info
+        contacts_collection = self._db["contacts"]
         for contact in contacts_collection.find():
             row = {"name": contact["name"]}
-            most_recent_attendance = self._get_most_recent_attendance(contact)
-            # Only include contacts that have attended today.
-            # TODO: Currently this will include contacts that have no attendance
-            # data, such as new contacts. This is a RushKit bug. Once fixed,
-            # this check should be updated to exlude contacts with no attendance
-            if most_recent_attendance and not self._is_today(most_recent_attendance):
+            attendance_info = self._get_attendance_info(contact)
+            # Exclude the contact if they did not check in today.
+            if not attendance_info["include_contact"]:
                 continue
-            if most_recent_attendance:
-                row["check_in_time"] = most_recent_attendance["checkInDate"].time()
-            else:
-                # TODO: This is a temporary fix for new contacts that have no
-                # attendance data. Once the RushKit bug is fixed, this should be
-                # removed.
-                row["check_in_time"] = datetime.time.min
             row.update(self._aggregate_survey_results(contact))
             pprint(row)
             rows.append(row)
         # Sort the rows in ascending order by check-in time
+        logger.info("Sorting contacts by check-in time.")
         rows.sort(key=lambda row: row["check_in_time"])
         return rows
 
@@ -102,6 +93,7 @@ class Rotator:
         # Brother recommendations are case-insensitive and stored in a set to
         # avoid duplicates as best as possible.
         brother_recs = set()
+        interests = set()
         for survey_id in survey_ids:
             survey = survey_collection.find_one({"_id": survey_id})
             fit_rating_sum += float(survey["fitRating"].to_decimal())
@@ -116,12 +108,58 @@ class Rotator:
             brother_recs.update(
                 [name.lower() for name in survey["brotherRecs"]]
             )
+            interests.update(
+                [interest.lower() for interest in survey["interestTags"]]
+            )
             num_surveys += 1
+
+        # Convert the sets to comma-separated strings
+        aggregates["brother_recs"] = brother_recs
+        aggregates["interests"] = interests
 
         if num_surveys > 0:
             aggregates["mean_fit_rating"] = fit_rating_sum / num_surveys
 
         return aggregates
+
+    # TODO: Revisit this method after RushKit bug fix.
+    def _get_attendance_info(self, contact):
+        """Gets the check-in and check out date for a contact.
+
+        Args:
+            contact (dict): The contact to get attendance data for.
+
+        Returns:
+            dict: A pair containing a boolean representing if this checked in today,
+            and a dictionary containing the check-in and check-out
+            dates for the contact.
+        """
+        logger.info(f"Getting attendance info for contact {contact["_id"]}.")
+        attendance_info = {
+            "check_in_time": None,
+            "check_out_time": None
+        }
+        most_recent_attendance = self._get_most_recent_attendance(contact)
+        # Only include contacts that have attended today.
+        # TODO: Currently this will include contacts that have no attendance
+        # data, such as new contacts. This is due to a RushKit bug. Once fixed,
+        # this check should be updated to exlude contacts with no attendance.
+        if most_recent_attendance and not self._is_today(most_recent_attendance):
+            return {"include_contact": False, "attendance_info": attendance_info}
+        if most_recent_attendance:
+            attendance_info["check_in_time"] = most_recent_attendance["checkInDate"].time()
+            if most_recent_attendance["checkOutDate"]:
+                attendance_info["check_out_time"] = most_recent_attendance["checkOutDate"].time()
+            else:
+                attendance_info["check_out_time"] = None
+        else:
+            # TODO: This is a temporary fix for new contacts that have no
+            # attendance data. Once the RushKit bug is fixed, this should be
+            # removed.
+            attendance_info["check_in_time"] = datetime.time.min
+            attendance_info["check_out_time"] = None
+
+        return {"include_contact": True, "attendance_info": attendance_info}
 
     def _get_most_recent_attendance(self, contact):
         """Gets the most recent attendance data for each contact.
@@ -133,9 +171,6 @@ class Rotator:
             The most recent attendance data for the contact, or None if the
             contact has no attendance data.
         """
-        logger.info(
-            f"Getting most recent attendance data for contact '{contact["_id"]}'."
-        )
         attendance_ids = contact["attendance"]
         if not attendance_ids:
             return None
