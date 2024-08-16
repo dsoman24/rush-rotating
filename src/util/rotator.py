@@ -44,6 +44,8 @@ class Rotator:
         self._sheet_editor.verify_or_create_data_sheet()
         # Ensure the data sheet is empty
         self._sheet_editor.clear_data_sheet()
+        # Create the rows for the data sheet
+        rows = self._create_rows()
 
         logger.info("Rotator data sheet successfully updated.")
 
@@ -58,8 +60,8 @@ class Rotator:
             # Exclude the contact if they did not check in today.
             if not attendance_info["include_contact"]:
                 continue
+            row.update(attendance_info["attendance_info"])
             row.update(self._aggregate_survey_results(contact))
-            pprint(row)
             rows.append(row)
         # Sort the rows in ascending order by check-in time
         logger.info("Sorting contacts by check-in time.")
