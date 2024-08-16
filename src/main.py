@@ -1,5 +1,6 @@
 """Driver for the Rush rotating script."""
 
+import os
 import certifi
 import logging
 
@@ -9,7 +10,7 @@ from util.rotator import Rotator
 
 logger = logging.getLogger(__name__)
 
-config = dotenv_values("src/.env")
+config = dotenv_values(os.path.join("src", ".env"))
 
 def main():
     logging.basicConfig(
