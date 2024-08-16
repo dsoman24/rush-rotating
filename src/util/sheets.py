@@ -9,6 +9,7 @@ from googleapiclient.discovery import build
 logger = logging.getLogger(__name__)
 
 _KEYS_DIR = "src/keys"
+# Name of the sheet that contains PNM data for rotating.
 _DATA_SHEET_NAME = 'data'
 
 class SheetEditor:
@@ -17,13 +18,18 @@ class SheetEditor:
     https://developers.google.com/sheets/api/guides/concepts?ref=hackernoon.com
     """
 
-    def __init__(self, spreadsheet_id: str):
+    def __init__(
+            self, spreadsheet_id: str,
+            data_sheet_name: str = _DATA_SHEET_NAME
+        ):
         """Initialize the SheetEditor class.
 
         Args:
             spreadsheet_id (str): The ID of the Google Sheet.
+            data_sheet_name (str): The name of the sheet to use for data.
         """
         self.spreadsheet_id = spreadsheet_id
+        self.data_sheet_name = data_sheet_name
         credentials = self._get_credentials()
         self.service = build("sheets", "v4", credentials=credentials)
 
@@ -139,16 +145,12 @@ class SheetEditor:
 
     def verify_or_create_data_sheet(self):
         """Verifies that the data sheet exists, creating it if necessary."""
-        if not self._sheet_exists(_DATA_SHEET_NAME):
-            logger.info(f"Creating {_DATA_SHEET_NAME} sheet.")
-            self._create_sheet(_DATA_SHEET_NAME)
+        if not self._sheet_exists(self.data_sheet_name):
+            logger.info(f"Creating {self.data_sheet_name} sheet.")
+            self._create_sheet(self.data_sheet_name)
         else:
-            logger.info(f"{_DATA_SHEET_NAME} sheet already exists.")
-        if not self._sheet_exists(_DATA_SHEET_NAME):
-            error_msg = f"'{_DATA_SHEET_NAME}' sheet was not created."
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+            logger.info(f"{self.data_sheet_name} sheet already exists.")
 
     def clear_data_sheet(self):
         """Clears the data sheet of all data."""
-        self._clear_sheet(_DATA_SHEET_NAME)
+        self._clear_sheet(self.data_sheet_name)
