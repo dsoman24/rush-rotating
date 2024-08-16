@@ -20,14 +20,13 @@ def main():
         format='[%(asctime)s] (%(levelname)s) %(name)s:%(lineno)d - %(message)s'
     )
     logger.info("Getting MongoDB Client.")
-    client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
-    rotator = Rotator(
-        client=client,
-        db_name=config["DB_NAME"],
-        spreadsheet_id=config["SHEET_ID"]
-    )
-    rotator.execute()
-    client.close()
+    with MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where()) as client:
+        rotator = Rotator(
+            client=client,
+            db_name=config["DB_NAME"],
+            spreadsheet_id=config["SHEET_ID"]
+        )
+        rotator.execute()
 
 if __name__ == '__main__':
     main()
