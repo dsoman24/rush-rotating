@@ -16,7 +16,7 @@ def main():
         filename="main.log",
         level=logging.INFO,
         filemode="w",
-        format='%(asctime)s: %(name)s - %(levelname)s - %(message)s'
+        format='[%(asctime)s] (%(levelname)s) %(name)s:%(lineno)d - %(message)s'
     )
     logger.info("Getting MongoDB Client.")
     client = MongoClient(config["ATLAS_URI"], tlsCAFile=certifi.where())
