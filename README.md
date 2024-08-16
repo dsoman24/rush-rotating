@@ -40,3 +40,7 @@ Logs are found in `main.log`.
 ## Additional Information
 * Google Cloud project link:
 https://console.cloud.google.com/welcome?project=rush-428023
+
+## TODO
+- [] Write rows to sheet
+- [] Benchmark runtime to establish a good period for continuous runs
