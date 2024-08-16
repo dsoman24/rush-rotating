@@ -117,7 +117,7 @@ class SheetEditor:
         for sheet in sheets:
             if sheet["properties"]["title"] == sheet_name:
                 return sheet["properties"]["sheetId"]
-        raise ValueError(f"Sheet with name {sheet_name} not found.")
+        raise ValueError(f"Sheet with name '{sheet_name}' not found.")
 
     def _clear_sheet(self, sheet_name: str) -> None:
         """Clears the sheet of all data.
@@ -146,10 +146,10 @@ class SheetEditor:
     def verify_or_create_data_sheet(self):
         """Verifies that the data sheet exists, creating it if necessary."""
         if not self._sheet_exists(self.data_sheet_name):
-            logger.info(f"Creating {self.data_sheet_name} sheet.")
+            logger.info(f"Creating sheet '{self.data_sheet_name}'.")
             self._create_sheet(self.data_sheet_name)
         else:
-            logger.info(f"{self.data_sheet_name} sheet already exists.")
+            logger.info(f"Sheet '{self.data_sheet_name}' already exists.")
 
     def clear_data_sheet(self):
         """Clears the data sheet of all data."""
