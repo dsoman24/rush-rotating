@@ -4,6 +4,8 @@ import datetime
 import logging
 
 from pprint import pprint
+
+from bson import ObjectId
 from util.sheets import SheetEditor
 from pymongo import MongoClient
 
@@ -72,7 +74,8 @@ class Rotator:
         # num reds, num greens, num pro, num con, brother recs (comma separated
         # string of names), interests (comma separated string of interests)
         logger.info("Updating the rotator data sheet.")
-        pnms = self._aggregate_pnm_data()
+        contactIds = self._get_contact_ids_by_todays_attendance()
+        pnms = self._aggregate_pnm_data(contactIds)
         rows = self._create_pnm_rows(pnms)
         self._sheet_editor.verify_or_create_data_sheet()
         # TODO: clear sheet only on a new day
@@ -81,12 +84,29 @@ class Rotator:
         self._sheet_editor.write_data_rows(rows)
         logger.info("Rotator data sheet successfully updated.")
 
-    def _aggregate_pnm_data(self):
+    def _get_contact_ids_by_todays_attendance(self):
+        attendance_collection = self._db["attendances"]
+        today = datetime.datetime.now(tz=datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        query = {
+            'checkInDate': {
+                '$gte': today,
+                '$lt': today.replace(hour=23, minute=59, second=59, microsecond=999999)
+            }
+        }
+        return [ObjectId(id) for id in attendance_collection.find(query).distinct("contactId")]
+
+
+    def _aggregate_pnm_data(self, contactIds):
         """Creates the PNM data for the data sheet based for all contacts."""
         pnm_data = []
         # Get the collection named "contacts"
         contacts_collection = self._db["contacts"]
-        for contact in contacts_collection.find():
+        query = {
+            '_id': {
+                '$in': contactIds
+            }
+        }
+        for contact in contacts_collection.find(query):
             data_dict = {"name": contact["name"]}
             attendance_info = self._get_attendance_info(contact)
             # Exclude the contact if they did not check in today.
