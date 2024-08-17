@@ -72,10 +72,11 @@ class Rotator:
         # num reds, num greens, num pro, num con, brother recs (comma separated
         # string of names), interests (comma separated string of interests)
         logger.info("Updating the rotator data sheet.")
-        self._sheet_editor.verify_or_create_data_sheet()
-        self._sheet_editor.clear_data_sheet()
         pnms = self._aggregate_pnm_data()
         rows = self._create_pnm_rows(pnms)
+        self._sheet_editor.verify_or_create_data_sheet()
+        # TODO: clear sheet only on a new day
+        self._sheet_editor.clear_data_sheet()
         self._sheet_editor.write_header()
         self._sheet_editor.write_data_rows(rows)
         logger.info("Rotator data sheet successfully updated.")
