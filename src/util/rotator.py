@@ -78,7 +78,18 @@ class Rotator:
         rows = self._create_pnm_rows(pnms)
         self._sheet_editor.write_header()
         self._sheet_editor.write_data_rows(rows)
+        self._get_todays_attendances()
         logger.info("Rotator data sheet successfully updated.")
+    def _get_todays_attendances(self):
+        attendance_collection = self._db["attendances"]
+        today = datetime.datetime.now(tz=datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        query = {
+            'checkInDate': {
+                '$gte': today,
+                '$lt': today.replace(hour=23, minute=59, second=59, microsecond=999999)
+            }
+        }
+        print(attendance_collection.find(query).distinct("contactId"))
 
     def _aggregate_pnm_data(self):
         """Creates the PNM data for the data sheet based for all contacts."""
