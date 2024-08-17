@@ -42,5 +42,5 @@ Logs are found in `main.log`.
 https://console.cloud.google.com/welcome?project=rush-428023
 
 ## TODO
-- [ ] Write rows to sheet
+- [X] Write rows to sheet
 - [ ] Benchmark runtime to establish a good period for continuous runs
