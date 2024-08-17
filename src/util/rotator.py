@@ -33,8 +33,8 @@ class PNMData:
         """Returns the PNM data as a list of strings for the data sheet."""
         return [
             self.name,
-            self.check_in_time.strftime("%H:%M"),
-            self.check_out_time.strftime("%H:%M") if self.check_out_time else "",
+            self.check_in_time.strftime("%I:%M %p"),
+            self.check_out_time.strftime("%I:%M %p") if self.check_out_time else "",
             str(self.avg_fit_rating),
             str(self.num_reds),
             str(self.num_greens),
@@ -95,6 +95,8 @@ class Rotator:
             data_dict.update(self._aggregate_survey_results(contact))
             pnm = PNMData(data_dict)
             pnm_data.append(pnm)
+        logger.info(f"Found {len(pnm_data)} contacts checked in today."
+                    " Their data has been successfully aggregated.")
         # Sort the rows in ascending order by check-in time
         logger.info("Sorting contacts by check-in time.")
         pnm_data.sort(key=lambda pnm: pnm.check_in_time)
@@ -141,7 +143,7 @@ class Rotator:
             elif survey["bidStatus"] == _PRO:
                 aggregates["num_pro"] += 1
             elif survey["bidStatus"] == _CON:
-                aggregates["num_cons"] += 1
+                aggregates["num_con"] += 1
             brother_recs.update(
                 [name.lower() for name in survey["brotherRecs"]]
             )
@@ -177,12 +179,14 @@ class Rotator:
         }
         most_recent_attendance = self._get_most_recent_attendance(contact)
         if not most_recent_attendance or not self._is_today(most_recent_attendance):
+            logger.info("Contact did not check in today.")
             return {"include_contact": False, "attendance_info": attendance_info}
         attendance_info["check_in_time"] = most_recent_attendance["checkInDate"].time()
         if most_recent_attendance.get("checkOutDate"):
             attendance_info["check_out_time"] = most_recent_attendance["checkOutDate"].time()
         else:
             attendance_info["check_out_time"] = None
+        logger.info("Contact is checked in today.")
         return {"include_contact": True, "attendance_info": attendance_info}
 
     def _get_most_recent_attendance(self, contact):
