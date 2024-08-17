@@ -143,6 +143,40 @@ class SheetEditor:
             body=request
         ).execute()
 
+    def _append_row(self, sheet_name: str, row: list) -> None:
+        """Appends a row to the end of the sheet.
+
+        Args:
+            sheet_name (str): The name of the sheet to write to.
+            row (list): The row to write.
+        """
+        sheet_id = self._get_sheet_id(sheet_name)
+        request = {
+            "requests": [
+                {
+                    "appendCells": {
+                        "sheetId": sheet_id,
+                        "rows": [
+                            {
+                                "values": [
+                                    {
+                                        "userEnteredValue": {
+                                            "stringValue": value
+                                        }
+                                    } for value in row
+                                ]
+                            }
+                        ],
+                        "fields": "*"
+                    }
+                }
+            ]
+        }
+        self.service.spreadsheets().batchUpdate(
+            spreadsheetId=self.spreadsheet_id,
+            body=request
+        ).execute()
+
     def verify_or_create_data_sheet(self):
         """Verifies that the data sheet exists, creating it if necessary."""
         if not self._sheet_exists(self.data_sheet_name):
@@ -154,3 +188,24 @@ class SheetEditor:
     def clear_data_sheet(self):
         """Clears the data sheet of all data."""
         self._clear_sheet(self.data_sheet_name)
+
+    def write_header(self):
+        """Writes the header to the data sheet."""
+        col_names = [
+            "Name", "Check-in Time", "Check-out Time", "Avg Fit Rating",
+            "Num Reds", "Num Greens", "Num Pro", "Num Con", "Brother Recs",
+            "Interests"
+        ]
+        logger.info(f"Writing header to sheet '{self.data_sheet_name}'.")
+        self._append_row(self.data_sheet_name, col_names)
+
+    def write_data_rows(self, rows: list):
+        """Writes the data rows to the data sheet.
+
+        Args:
+            rows (list): The rows to write.
+        """
+        logger.info(f"Writing {len(rows)} rows to the data sheet '{self.data_sheet_name}'.")
+        for row in rows:
+            self._append_row(self.data_sheet_name, row)
+            logger.info(f"Appended row to sheet '{self.data_sheet_name}'.")

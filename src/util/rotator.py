@@ -15,9 +15,41 @@ _RED = "Red"
 _PRO = "Pro/Put Up"
 _CON = "Con"
 
+class PNMData:
+
+    def __init__(self, data_dict):
+        self.name = data_dict["name"]
+        self.check_in_time = data_dict["check_in_time"]
+        self.check_out_time = data_dict["check_out_time"]
+        self.avg_fit_rating = data_dict["mean_fit_rating"]
+        self.num_reds = data_dict["num_reds"]
+        self.num_greens = data_dict["num_greens"]
+        self.num_pro = data_dict["num_pro"]
+        self.num_con = data_dict["num_con"]
+        self.brother_recs = data_dict["brother_recs"]
+        self.interests = data_dict["interests"]
+
+    def get_row_list(self):
+        """Returns the PNM data as a list of strings for the data sheet."""
+        return [
+            self.name,
+            self.check_in_time.strftime("%H:%M"),
+            self.check_out_time.strftime("%H:%M") if self.check_out_time else "",
+            str(self.avg_fit_rating),
+            str(self.num_reds),
+            str(self.num_greens),
+            str(self.num_pro),
+            str(self.num_con),
+            ", ".join(self.brother_recs),
+            ", ".join(self.interests)
+        ]
 
 class Rotator:
-    """Driver class for the Rush rotating script."""
+    """Driver class for the Rush rotating script.
+
+    Implements logic to get checked-in contacts from the database and update
+    the PNM data sheet with the relevant information.
+    """
 
     def __init__(
             self,
@@ -31,7 +63,7 @@ class Rotator:
             db_name (str): The name of the database to use.
         """
         self._client = client
-        self._db = client[db_name]
+        self._db = self._client[db_name]
         self._sheet_editor = SheetEditor(spreadsheet_id)
 
     def execute(self):
@@ -40,33 +72,36 @@ class Rotator:
         # num reds, num greens, num pro, num con, brother recs (comma separated
         # string of names), interests (comma separated string of interests)
         logger.info("Updating the rotator data sheet.")
-        # Create the data sheet if it doesn't exist
         self._sheet_editor.verify_or_create_data_sheet()
-        # Ensure the data sheet is empty
         self._sheet_editor.clear_data_sheet()
-        # Create the rows for the data sheet
-        rows = self._create_rows()
-
+        pnms = self._aggregate_pnm_data()
+        rows = self._create_pnm_rows(pnms)
+        self._sheet_editor.write_header()
+        self._sheet_editor.write_data_rows(rows)
         logger.info("Rotator data sheet successfully updated.")
 
-    def _create_rows(self):
-        """Creates the rows for the data sheet based for all contacts."""
-        rows = []
+    def _aggregate_pnm_data(self):
+        """Creates the PNM data for the data sheet based for all contacts."""
+        pnm_data = []
         # Get the collection named "contacts"
         contacts_collection = self._db["contacts"]
         for contact in contacts_collection.find():
-            row = {"name": contact["name"]}
+            data_dict = {"name": contact["name"]}
             attendance_info = self._get_attendance_info(contact)
             # Exclude the contact if they did not check in today.
             if not attendance_info["include_contact"]:
                 continue
-            row.update(attendance_info["attendance_info"])
-            row.update(self._aggregate_survey_results(contact))
-            rows.append(row)
+            data_dict.update(attendance_info["attendance_info"])
+            data_dict.update(self._aggregate_survey_results(contact))
+            pnm = PNMData(data_dict)
+            pnm_data.append(pnm)
         # Sort the rows in ascending order by check-in time
         logger.info("Sorting contacts by check-in time.")
-        rows.sort(key=lambda row: row["check_in_time"])
-        return rows
+        pnm_data.sort(key=lambda pnm: pnm.check_in_time)
+        return pnm_data
+
+    def _create_pnm_rows(self, pnm_data):
+        return [pnm.get_row_list() for pnm in pnm_data]
 
     def _aggregate_survey_results(self, contact):
         """Aggregates the survey results for one contact.
@@ -124,7 +159,6 @@ class Rotator:
 
         return aggregates
 
-    # TODO: Revisit this method after RushKit bug fix.
     def _get_attendance_info(self, contact):
         """Gets the check-in and check out date for a contact.
 
@@ -142,25 +176,13 @@ class Rotator:
             "check_out_time": None
         }
         most_recent_attendance = self._get_most_recent_attendance(contact)
-        # Only include contacts that have attended today.
-        # TODO: Currently this will include contacts that have no attendance
-        # data, such as new contacts. This is due to a RushKit bug. Once fixed,
-        # this check should be updated to exlude contacts with no attendance.
-        if most_recent_attendance and not self._is_today(most_recent_attendance):
+        if not most_recent_attendance or not self._is_today(most_recent_attendance):
             return {"include_contact": False, "attendance_info": attendance_info}
-        if most_recent_attendance:
-            attendance_info["check_in_time"] = most_recent_attendance["checkInDate"].time()
-            if most_recent_attendance["checkOutDate"]:
-                attendance_info["check_out_time"] = most_recent_attendance["checkOutDate"].time()
-            else:
-                attendance_info["check_out_time"] = None
+        attendance_info["check_in_time"] = most_recent_attendance["checkInDate"].time()
+        if most_recent_attendance.get("checkOutDate"):
+            attendance_info["check_out_time"] = most_recent_attendance["checkOutDate"].time()
         else:
-            # TODO: This is a temporary fix for new contacts that have no
-            # attendance data. Once the RushKit bug is fixed, this should be
-            # removed.
-            attendance_info["check_in_time"] = datetime.time.min
             attendance_info["check_out_time"] = None
-
         return {"include_contact": True, "attendance_info": attendance_info}
 
     def _get_most_recent_attendance(self, contact):
