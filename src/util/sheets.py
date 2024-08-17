@@ -177,6 +177,43 @@ class SheetEditor:
             body=request
         ).execute()
 
+    def _write_rows(self, sheet_name: str, rows: list) -> None:
+        """Writes multiple rows to the sheet.
+
+        Args:
+            sheet_name (str): The name of the sheet to write to.
+            rows (list): The rows to write, list of lists of str.
+        """
+        sheet_id = self._get_sheet_id(sheet_name)
+        request = {
+            "requests": [
+                {
+                    "updateCells": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": 1,  # Skip header row
+                        },
+                        "rows": [
+                            {
+                                "values": [
+                                    {
+                                        "userEnteredValue": {
+                                            "stringValue": value
+                                        }
+                                    } for value in row
+                                ]
+                            } for row in rows
+                        ],
+                        "fields": "*"
+                    }
+                }
+            ],
+        }
+        self.service.spreadsheets().batchUpdate(
+            spreadsheetId=self.spreadsheet_id,
+            body=request
+        ).execute()
+
     def verify_or_create_data_sheet(self):
         """Verifies that the data sheet exists, creating it if necessary."""
         if not self._sheet_exists(self.data_sheet_name):
@@ -203,9 +240,7 @@ class SheetEditor:
         """Writes the data rows to the data sheet.
 
         Args:
-            rows (list): The rows to write.
+            rows (list): The rows to write, list of lists of str.
         """
         logger.info(f"Writing {len(rows)} rows to the data sheet '{self.data_sheet_name}'.")
-        for row in rows:
-            self._append_row(self.data_sheet_name, row)
-            logger.info(f"Appended row to sheet '{self.data_sheet_name}'.")
+        self._write_rows(self.data_sheet_name, rows)
