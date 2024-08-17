@@ -74,13 +74,15 @@ class Rotator:
         logger.info("Updating the rotator data sheet.")
         self._sheet_editor.verify_or_create_data_sheet()
         self._sheet_editor.clear_data_sheet()
-        pnms = self._aggregate_pnm_data()
+        contactIds = self._get_contact_ids_by_todays_attendance()
+        pnms = self._aggregate_pnm_data(contactIds)
         rows = self._create_pnm_rows(pnms)
         self._sheet_editor.write_header()
         self._sheet_editor.write_data_rows(rows)
-        self._get_todays_attendances()
+        
         logger.info("Rotator data sheet successfully updated.")
-    def _get_todays_attendances(self):
+    
+    def _get_contact_ids_by_todays_attendance(self):
         attendance_collection = self._db["attendances"]
         today = datetime.datetime.now(tz=datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         query = {
@@ -89,14 +91,20 @@ class Rotator:
                 '$lt': today.replace(hour=23, minute=59, second=59, microsecond=999999)
             }
         }
-        print(attendance_collection.find(query).distinct("contactId"))
+        return [ObjectId(id) for id in attendance_collection.find(query).distinct("contactId")]
+            
 
-    def _aggregate_pnm_data(self):
+    def _aggregate_pnm_data(self, contactIds):
         """Creates the PNM data for the data sheet based for all contacts."""
         pnm_data = []
         # Get the collection named "contacts"
         contacts_collection = self._db["contacts"]
-        for contact in contacts_collection.find():
+        query = {
+            '_id': {
+                '$in': contactIds
+            }
+        }
+        for contact in contacts_collection.find(query):
             data_dict = {"name": contact["name"]}
             attendance_info = self._get_attendance_info(contact)
             # Exclude the contact if they did not check in today.
