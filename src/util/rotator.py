@@ -173,10 +173,10 @@ class Rotator:
             elif survey["bidStatus"] == _CON:
                 aggregates["num_con"] += 1
             brother_recs.update(
-                [name.lower() for name in survey["brotherRecs"]]
+                [name.lower().strip() for name in survey["brotherRecs"]]
             )
             interests.update(
-                [interest.lower() for interest in survey["interestTags"]]
+                [interest.lower().strip() for interest in survey["interestTags"]]
             )
             num_surveys += 1
 
