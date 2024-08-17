@@ -8,6 +8,7 @@ from pprint import pprint
 from bson import ObjectId
 from util.sheets import SheetEditor
 from pymongo import MongoClient
+from datetime import datetime, timedelta, timezone, date
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +34,16 @@ class PNMData:
 
     def get_row_list(self):
         """Returns the PNM data as a list of strings for the data sheet."""
+        est_offset = timedelta(hours=-5)
+        est_check_in_time = datetime.combine(date.today(), self.check_in_time) + est_offset
+        est_check_out_time = None
+        if self.check_out_time:
+            est_check_out_time = datetime.combine(date.today(), self.check_out_time) + est_offset
+
         return [
             self.name,
-            self.check_in_time.strftime("%I:%M %p"),
-            self.check_out_time.strftime("%I:%M %p") if self.check_out_time else "",
+            est_check_in_time.strftime("%I:%M %p"),
+            est_check_out_time.strftime("%I:%M %p") if est_check_out_time else "",
             str(self.avg_fit_rating),
             str(self.num_reds),
             str(self.num_greens),
@@ -86,7 +93,7 @@ class Rotator:
 
     def _get_contact_ids_by_todays_attendance(self):
         attendance_collection = self._db["attendances"]
-        today = datetime.datetime.now(tz=datetime.timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         query = {
             'checkInDate': {
                 '$gte': today,
@@ -224,7 +231,7 @@ class Rotator:
         if not attendance_ids:
             return None
         attendance_collection = self._db["attendances"]
-        latest_check_in = datetime.datetime.min
+        latest_check_in = datetime.min
         latest_attendance = None
         for attendance_id in attendance_ids:
             attendance = attendance_collection.find_one({"_id": attendance_id})
@@ -243,4 +250,4 @@ class Rotator:
         Returns:
             bool: True if the contact is here today, False otherwise.
         """
-        return attendance["checkInDate"].date() == datetime.date.today()
+        return attendance["checkInDate"].date() == date.today()
