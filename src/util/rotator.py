@@ -80,31 +80,52 @@ class Rotator:
         # Row: PNM name, check in time, check out time, avg fit rating,
         # num reds, num greens, num pro, num con, brother recs (comma separated
         # string of names), interests (comma separated string of interests)
-        logger.info("Updating the rotator data sheet.")
+        logger.info("Aggregating PNM Data")
         contactIds = self._get_contact_ids_by_todays_attendance()
         pnms = self._aggregate_pnm_data(contactIds)
         rows = self._create_pnm_rows(pnms)
         self._sheet_editor.verify_or_create_data_sheet()
+        logger.info("Aggregated Info Successfully")
         # TODO: clear sheet only on a new day
+        logger.info("Updating the rotator data sheet.")
         self._sheet_editor.clear_data_sheet()
         self._sheet_editor.write_header()
         self._sheet_editor.write_data_rows(rows)
         logger.info("Rotator data sheet successfully updated.")
 
     def _get_contact_ids_by_todays_attendance(self):
+        logger.info("Getting Contact Ids from Database")
         attendance_collection = self._db["attendances"]
-        today = datetime.now(tz=timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        # For EST (Eastern Standard Time)
+        #utc_offset = timedelta(hours=-5)
+
+        # For EDT (daylight saving time)
+        utc_offset = timedelta(hours=-4)
+        
+        est = timezone(utc_offset)
+        
+        today_est = datetime.now(tz=est)
+        start_of_day_est = today_est.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day_est = today_est.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        start_of_day_utc = start_of_day_est.astimezone(timezone.utc)
+        end_of_day_utc = end_of_day_est.astimezone(timezone.utc)
+        
+        
         query = {
             'checkInDate': {
-                '$gte': today,
-                '$lt': today.replace(hour=23, minute=59, second=59, microsecond=999999)
+                '$gte': start_of_day_utc,
+                '$lt': end_of_day_utc
             }
         }
-        return [ObjectId(id) for id in attendance_collection.find(query).distinct("contactId")]
+        contactIds = [ObjectId(id) for id in attendance_collection.find(query).distinct("contactId")]
+        logger.info("Retrieved Contact Ids from Database")
+        return contactIds
 
 
     def _aggregate_pnm_data(self, contactIds):
         """Creates the PNM data for the data sheet based for all contacts."""
+        logger.info("Getting PNM Data from Database")
         pnm_data = []
         # Get the collection named "contacts"
         contacts_collection = self._db["contacts"]
@@ -128,10 +149,14 @@ class Rotator:
         # Sort the rows in ascending order by check-in time
         logger.info("Sorting contacts by check-in time.")
         pnm_data.sort(key=lambda pnm: pnm.check_in_time)
+        logger.info("Retrieved PNM Data from Database")
         return pnm_data
 
     def _create_pnm_rows(self, pnm_data):
-        return [pnm.get_row_list() for pnm in pnm_data]
+        logger.info("Creating PNM rows")
+        rows = [pnm.get_row_list() for pnm in pnm_data]
+        logger.info("Successfully created PNM rows")
+        return rows
 
     def _aggregate_survey_results(self, contact):
         """Aggregates the survey results for one contact.
@@ -143,7 +168,7 @@ class Rotator:
             dict: A dictionary mapping each aggregate to its value.
         """
         logger.info(
-            f"Aggregating survey results for contact '{contact["_id"]}'."
+            f"Aggregating survey results for contact '{contact['_id']}'."
         )
         aggregates = {
             "mean_fit_rating": float("nan"),
@@ -161,9 +186,13 @@ class Rotator:
         # avoid duplicates as best as possible.
         brother_recs = set()
         interests = set()
-        for survey_id in survey_ids:
-            survey = survey_collection.find_one({"_id": survey_id})
-            fit_rating_sum += float(survey["fitRating"].to_decimal())
+        query = {
+            '_id': {
+                '$in': survey_ids
+            }
+        }
+        for survey in survey_collection.find(query):
+            fit_rating_sum += float(survey["fitRating"].to_decimal()) if survey["fitRating"] != "NoneType" else 0
             if survey["bidStatus"] == _GREEN:
                 aggregates["num_greens"] += 1
             elif survey["bidStatus"] == _RED:
@@ -200,15 +229,12 @@ class Rotator:
             and a dictionary containing the check-in and check-out
             dates for the contact.
         """
-        logger.info(f"Getting attendance info for contact {contact["_id"]}.")
+        logger.info(f"Getting attendance info for contact {contact['_id']}.")
         attendance_info = {
             "check_in_time": None,
             "check_out_time": None
         }
         most_recent_attendance = self._get_most_recent_attendance(contact)
-        if not most_recent_attendance or not self._is_today(most_recent_attendance):
-            logger.info("Contact did not check in today.")
-            return {"include_contact": False, "attendance_info": attendance_info}
         attendance_info["check_in_time"] = most_recent_attendance["checkInDate"].time()
         if most_recent_attendance.get("checkOutDate"):
             attendance_info["check_out_time"] = most_recent_attendance["checkOutDate"].time()
@@ -233,21 +259,14 @@ class Rotator:
         attendance_collection = self._db["attendances"]
         latest_check_in = datetime.min
         latest_attendance = None
-        for attendance_id in attendance_ids:
-            attendance = attendance_collection.find_one({"_id": attendance_id})
+        query = {
+            '_id': {
+                '$in': attendance_ids
+            }
+        }
+        for attendance in attendance_collection.find(query):
             check_in_datetime = attendance["checkInDate"]
             if check_in_datetime > latest_check_in:
                 latest_check_in = check_in_datetime
                 latest_attendance = attendance
         return latest_attendance
-
-    def _is_today(self, attendance):
-        """Checks if this attendance data is for today.
-
-        Args:
-            attendance (dict): The attendance data to check.
-
-        Returns:
-            bool: True if the contact is here today, False otherwise.
-        """
-        return attendance["checkInDate"].date() == date.today()
