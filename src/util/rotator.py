@@ -33,7 +33,7 @@ class PNMData:
         self.interests = data_dict["interests"]
         self.num_of_days_since_bid = data_dict["num_of_days_since_bid"]
         self.days_rushed = data_dict["days_rushed"]
-        self.release = self.num_of_days_since_bid >= 2 or (self.num_of_days_since_bid == "No Pros" and self.days_rushed >=2)
+        self.release = (not isinstance(self.num_of_days_since_bid, str) and self.num_of_days_since_bid >= 2) or (self.num_of_days_since_bid == "No Pros" and self.days_rushed >=2)
 
     def get_row_list(self):
         """Returns the PNM data as a list of strings for the data sheet."""
@@ -279,20 +279,19 @@ class Rotator:
             }
         }
         attendances = attendance_collection.find(query)
-        print(attendances)
-        days_rushed = len(list(attendances))
-        for attendance in attendances:
+        for attendance in list(attendances):
             check_in_datetime = attendance["checkInDate"]
             if check_in_datetime > latest_check_in:
                 latest_check_in = check_in_datetime
                 latest_attendance = attendance
+        days_rushed = len(list(attendances))
         return latest_attendance, days_rushed
         
     def _get_num_of_attendances_from_date(self, start, contact_id):
         attendance_collection = self._db["attendances"]
         attendances = attendance_collection.find({ "contactId":contact_id })
         count = 0
-        for attendance in attendances:
+        for attendance in list(attendances):
             check_in_datetime = attendance["checkInDate"]
             if check_in_datetime > start:
                 count += 1
