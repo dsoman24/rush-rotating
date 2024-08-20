@@ -31,6 +31,7 @@ class PNMData:
         self.num_con = data_dict["num_con"]
         self.brother_recs = data_dict["brother_recs"]
         self.interests = data_dict["interests"]
+        self.num_of_days_since_bid = data_dict["num_of_days_since_bid"]
 
     def get_row_list(self):
         """Returns the PNM data as a list of strings for the data sheet."""
@@ -50,7 +51,8 @@ class PNMData:
             str(self.num_pro),
             str(self.num_con),
             ", ".join(self.brother_recs),
-            ", ".join(self.interests)
+            ", ".join(self.interests),
+            str(self.num_of_days_since_bid),
         ]
 
 class Rotator:
@@ -175,13 +177,15 @@ class Rotator:
             "num_reds": 0,
             "num_greens": 0,
             "num_pro": 0,
-            "num_con": 0
+            "num_con": 0,
+            "num_of_days_since_bid": 0,
         }
         # Get the contact's surveys
         survey_ids = contact["surveyInfo"]
         survey_collection = self._db["surveys"]
         num_surveys = 0
         fit_rating_sum = 0
+        most_recent_pro = datetime.min
         # Brother recommendations are case-insensitive and stored in a set to
         # avoid duplicates as best as possible.
         brother_recs = set()
@@ -199,19 +203,23 @@ class Rotator:
                 aggregates["num_reds"] += 1
             elif survey["bidStatus"] == _PRO:
                 aggregates["num_pro"] += 1
+                if (most_recent_pro < survey["createdAt"]):
+                    most_recent_pro = survey["createdAt"]
             elif survey["bidStatus"] == _CON:
                 aggregates["num_con"] += 1
             brother_recs.update(
-                [name.lower().strip() for name in survey["brotherRecs"]]
+                [name.lower() for name in survey["brotherRecs"]]
             )
             interests.update(
-                [interest.lower().strip() for interest in survey["interestTags"]]
+                [interest.lower() for interest in survey["interestTags"]]
             )
             num_surveys += 1
-
+            
+        num_of_days_since_bid = self._get_num_of_attendances_from_date(most_recent_pro, str(contact["_id"])) if aggregates["num_pro"] > 0 else "No Pros"
         # Convert the sets to comma-separated strings
         aggregates["brother_recs"] = brother_recs
         aggregates["interests"] = interests
+        aggregates["num_of_days_since_bid"] = num_of_days_since_bid
 
         if num_surveys > 0:
             aggregates["mean_fit_rating"] = fit_rating_sum / num_surveys
@@ -232,7 +240,7 @@ class Rotator:
         logger.info(f"Getting attendance info for contact {contact['_id']}.")
         attendance_info = {
             "check_in_time": None,
-            "check_out_time": None
+            "check_out_time": None,
         }
         most_recent_attendance = self._get_most_recent_attendance(contact)
         attendance_info["check_in_time"] = most_recent_attendance["checkInDate"].time()
@@ -270,3 +278,13 @@ class Rotator:
                 latest_check_in = check_in_datetime
                 latest_attendance = attendance
         return latest_attendance
+        
+    def _get_num_of_attendances_from_date(self, start, contact_id):
+        attendance_collection = self._db["attendances"]
+        attendances = attendance_collection.find({ "contactId":contact_id })
+        count = 0
+        for attendance in attendances:
+            check_in_datetime = attendance["checkInDate"]
+            if check_in_datetime > start:
+                count += 1
+        return count
