@@ -32,6 +32,8 @@ class PNMData:
         self.brother_recs = data_dict["brother_recs"]
         self.interests = data_dict["interests"]
         self.num_of_days_since_bid = data_dict["num_of_days_since_bid"]
+        self.days_rushed = data_dict["days_rushed"]
+        self.release = self.num_of_days_since_bid >= 2 or (self.num_of_days_since_bid == "No Pros" and self.days_rushed >=2)
 
     def get_row_list(self):
         """Returns the PNM data as a list of strings for the data sheet."""
@@ -53,6 +55,8 @@ class PNMData:
             ", ".join(self.brother_recs),
             ", ".join(self.interests),
             str(self.num_of_days_since_bid),
+            str(self.days_rushed),
+            str(self.release),
         ]
 
 class Rotator:
@@ -179,6 +183,7 @@ class Rotator:
             "num_pro": 0,
             "num_con": 0,
             "num_of_days_since_bid": 0,
+            "days_rushed": 0,
         }
         # Get the contact's surveys
         survey_ids = contact["surveyInfo"]
@@ -241,8 +246,9 @@ class Rotator:
         attendance_info = {
             "check_in_time": None,
             "check_out_time": None,
+            "days_rushed": 0,
         }
-        most_recent_attendance = self._get_most_recent_attendance(contact)
+        most_recent_attendance, attendance_info["days_rushed"] = self._get_most_recent_attendance(contact)
         attendance_info["check_in_time"] = most_recent_attendance["checkInDate"].time()
         if most_recent_attendance.get("checkOutDate"):
             attendance_info["check_out_time"] = most_recent_attendance["checkOutDate"].time()
@@ -272,12 +278,15 @@ class Rotator:
                 '$in': attendance_ids
             }
         }
-        for attendance in attendance_collection.find(query):
+        attendances = attendance_collection.find(query)
+        print(attendances)
+        days_rushed = len(list(attendances))
+        for attendance in attendances:
             check_in_datetime = attendance["checkInDate"]
             if check_in_datetime > latest_check_in:
                 latest_check_in = check_in_datetime
                 latest_attendance = attendance
-        return latest_attendance
+        return latest_attendance, days_rushed
         
     def _get_num_of_attendances_from_date(self, start, contact_id):
         attendance_collection = self._db["attendances"]

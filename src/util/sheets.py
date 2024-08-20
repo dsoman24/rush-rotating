@@ -231,7 +231,7 @@ class SheetEditor:
         col_names = [
             "Name", "Check-in Time", "Check-out Time", "Avg Fit Rating",
             "Num Reds", "Num Greens", "Num Pro", "Num Con", "Brother Recs",
-            "Interests", "Days Since Last Pro",
+            "Interests", "Days Since Last Pro", "Days Rushed", "Up For Release"
         ]
         logger.info(f"Writing header to sheet '{self.data_sheet_name}'.")
         self._append_row(self.data_sheet_name, col_names)
